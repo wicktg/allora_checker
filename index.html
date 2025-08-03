@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Allora $ALLO Rewards</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #000;
+        color: #fff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-top: 40px;
+      }
+
+      h1 {
+        font-size: 2.2rem;
+        font-weight: 500;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .logo {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+      }
+
+      .input-wrapper {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 30px;
+      }
+
+      input {
+        padding: 10px 15px;
+        font-size: 1rem;
+        border: 1px solid #fff;
+        background-color: #111;
+        color: #fff;
+        border-radius: 8px;
+        transition: 0.3s ease;
+        outline: none;
+      }
+
+      input:focus {
+        border-color: #ccc;
+        background-color: #222;
+      }
+
+      button {
+        padding: 10px 20px;
+        font-size: 1rem;
+        border: none;
+        background: #fff;
+        color: #000;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: background 0.3s ease;
+      }
+
+      button:hover {
+        background: #ddd;
+      }
+
+      .results {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        width: 90%;
+        max-width: 600px;
+        margin-top: 20px;
+      }
+
+      .card {
+        width: 100%;
+        background: #111;
+        border: 1px solid #333;
+        border-radius: 12px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        transition: transform 0.3s ease, background 0.3s ease;
+        opacity: 0;
+        transform: translateY(10px);
+        animation: fadeInUp 0.4s forwards;
+      }
+
+      .card:hover {
+        transform: translateY(-2px) scale(1.01);
+        background: #181818;
+      }
+
+      .reward {
+        font-size: 1.7rem;
+        font-weight: bold;
+        color: #0f0;
+        text-align: center;
+      }
+
+      .value {
+        font-size: 1rem;
+        color: #ccc;
+        margin-left: 10px;
+      }
+
+      .estimate {
+        font-size: 1.1rem;
+        background: #000;
+        padding: 10px 15px;
+        border-radius: 8px;
+        border: 1px solid #444;
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .status {
+        margin-top: 10px;
+        color: #888;
+        font-size: 0.95rem;
+      }
+
+      @keyframes fadeInUp {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>
+      <img class="logo" src="Untitled123.png" alt="Allora logo" />
+      Unofficial Allora Checker
+    </h1>
+
+    <div class="input-wrapper">
+      <input type="text" id="username" placeholder="Enter username" />
+      <button onclick="calculateReward()">Check Reward</button>
+    </div>
+
+    <div id="status" class="status"></div>
+    <div class="results" id="results"></div>
+
+    <script>
+      const REWARD_POOL = 7500000;
+      const TOTAL_MIND_SHARE = 95.24;
+
+      function formatUsd(val) {
+        return (
+          "$" +
+          Number(val).toLocaleString(undefined, { minimumFractionDigits: 2 })
+        );
+      }
+
+      async function calculateReward() {
+        const username = document.getElementById("username").value.trim();
+        const status = document.getElementById("status");
+        const results = document.getElementById("results");
+        results.innerHTML = "";
+        status.textContent = "Calculating...";
+
+        if (!username) {
+          status.textContent = "Please enter a username.";
+          return;
+        }
+
+        try {
+          const res = await fetch(`/api/search?username=${username}`);
+          const json = await res.json();
+          const entries = json.data || [];
+
+          const durations = {
+            "30D": { mindshare: 0, weight: 0.1 },
+            "3M": { mindshare: 0, weight: 0.3 },
+            "6M": { mindshare: 0, weight: 0.2 },
+          };
+
+          let eligible = false;
+
+          for (const e of entries) {
+            if (
+              e.topic_id === "ALLORA" &&
+              durations[e.duration] &&
+              e.rank <= 100
+            ) {
+              durations[e.duration].mindshare = e.mindshare;
+              eligible = true;
+            }
+          }
+
+          if (!eligible) {
+            status.textContent = "Sorry, you are not eligible.";
+            return;
+          }
+
+          const userMindshare =
+            durations["30D"].mindshare * durations["30D"].weight +
+            durations["3M"].mindshare * durations["3M"].weight +
+            durations["6M"].mindshare * durations["6M"].weight;
+
+          const rewardShare = (userMindshare / TOTAL_MIND_SHARE) * 0.5;
+          const alloReward = +(rewardShare * REWARD_POOL).toFixed(2);
+
+          const estimate = (fdv) =>
+            formatUsd((alloReward / 1_000_000_000) * fdv);
+
+          const card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <div class="reward">You are eligible for ${alloReward} $ALLO</div>
+            <div class="estimate">🚀 Bull Case (FDV $1B–$3B): <span class="value">${estimate(
+              1000000000
+            )} – ${estimate(3000000000)}</span></div>
+            <div class="estimate">⚡ Mid Case (FDV $600M–$800M): <span class="value">${estimate(
+              600000000
+            )} – ${estimate(800000000)}</span></div>
+            <div class="estimate">📉 Decent Case (FDV $300M–$500M): <span class="value">${estimate(
+              300000000
+            )} – ${estimate(500000000)}</span></div>
+          `;
+
+          results.appendChild(card);
+          status.textContent = "";
+        } catch (err) {
+          console.error(err);
+          status.textContent = "⚠️ Error fetching data. Try again.";
+        }
+      }
+    </script>
+  </body>
+</html>
